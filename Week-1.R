@@ -9,13 +9,7 @@ sprices <-
     select(date, price = adjusted)
 sprices
 
-sprices %>%
-    ggplot(aes(x = date, y = price)) +
-    geom_line() +
-    geom_smooth(method = 'lm', se = F) +
-    theme_bw() +
-    scale_x_date(date_breaks = '2 month') +
-    labs(x = 'date', y = 'stock price (USD)', title = 'Daily stock price for Sprint (S)')
+sprices %<>% mutate(date_numeric = as.numeric(date))
 
 linFit <- lm(formula = price ~ date, data = sprices)
 linFit
@@ -23,6 +17,9 @@ linFit
 sprices %<>% rownames_to_column('id') %>% mutate(id=as.numeric(id))
 linFit2 <- lm(formula = price ~ id, data = sprices)
 linFit2
+
+linFit3 <- lm(price~date_numeric, sprices)
+linFit3
 
 nextMonth <- tibble(date=seq.Date(from = as.Date('2018-04-01'), to = as.Date('2018-05-01'),by = '1 day'))
 nextMonth %<>% rownames_to_column('id') %>% mutate(id=as.numeric(id)+536)
