@@ -1,5 +1,6 @@
 library(tidyquant)
 library(magrittr)
+library(forecast)
 sprices <-
     tq_get(x = 'S',
            get = 'stock.prices',
@@ -17,10 +18,17 @@ sprices %>%
     labs(x = 'date', y = 'stock price (USD)', title = 'Daily stock price for Sprint (S)')
 
 linFit <- lm(formula = price ~ date, data = sprices)
+linFit
+
+sprices %<>% rownames_to_column('id') %>% mutate(id=as.numeric(id))
+linFit2 <- lm(formula = price ~ id, data = sprices)
+linFit2
 
 nextMonth <- tibble(date=seq.Date(from = as.Date('2018-04-01'), to = as.Date('2018-05-01'),by = '1 day'))
-nextMonth$price = predict(linFit,nextMonth)
-nextMonth$type = 'Prediction'
+nextMonth %<>% rownames_to_column('id') %>% mutate(id=as.numeric(id)+536)
+nextMonth$linFit_datemodel = predict(linFit,nextMonth)
+nextMonth$linFit_rowIDmodel = predict(linFit2, nextMonth)
+nextMonth <- reshape2::melt(nextMonth,id=c('id','date')) %>% rename(type=variable,price=value)
 
 sprices %<>%
     mutate(type='Data') %>%
@@ -28,8 +36,12 @@ sprices %<>%
 
 sprices %>%
     ggplot(aes(x = date, y = price)) +
-    geom_smooth(method = 'lm', se = F,size=.3) +
+    geom_smooth(method = 'lm', se = F,size=.3, lty=2) +
+    # geom_line(aes(y=price_linFit2), col='black', size=1)+
     geom_line(aes(col=type),size=1) +
     theme_bw() +
     scale_x_date(date_breaks = '2 month') +
-    labs(x = 'date', y = 'stock price (USD)', title = 'Daily stock price for Sprint (S)')
+    labs(x = 'date', y = 'stock price (USD)', title = 'Daily stock price for Sprint (S)',
+         caption = 'Blue dotted line - lm-fit using ggplot2::geom_smooth')
+
+# plot(forecast(object = ts(sprices$price)),xlim=c(400,520))
