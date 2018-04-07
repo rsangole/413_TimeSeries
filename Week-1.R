@@ -1,6 +1,7 @@
 library(tidyquant)
 library(magrittr)
 library(forecast)
+library(dplyr)
 sprices <-
     tq_get(x = 'S',
            get = 'stock.prices',
@@ -42,3 +43,24 @@ sprices %>%
          caption = 'Blue dotted line - lm-fit using ggplot2::geom_smooth')
 
 # plot(forecast(object = ts(sprices$price)),xlim=c(400,520))
+
+
+
+cdata <- feather::read_feather('to_rahul.feather')
+cdata
+cdata %>% count(esn)
+cdata <- cdata %>% nest(-esn)
+cdata
+df1 <- cdata$data[[4]]
+df1
+df1.ts <- ts(data = df1$avg_imp,frequency = 5)
+df1.ts
+df1.decomposed <- decompose(df1.ts)
+plot(df1.decomposed)
+plot(df1.ts)
+plot(df1.ts-df1.decomposed$seasonal)
+fit <- HoltWinters(df1.ts,beta = F,gamma = F)
+plot(fit)
+r <- forecast(fit)
+plot(r)
+acf(x = r$residuals[2:288])
