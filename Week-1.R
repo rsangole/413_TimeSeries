@@ -47,20 +47,28 @@ sprices %>%
 
 
 cdata <- feather::read_feather('to_rahul.feather')
+cdata %<>% add_count(esn)
+cdata <- cdata %>% filter(n>150) %>% dplyr::select(-n) %>% nest(-esn)
 cdata
-cdata %>% count(esn)
-cdata <- cdata %>% nest(-esn)
-cdata
-df1 <- cdata$data[[4]]
-df1
-df1.ts <- ts(data = df1$avg_imp,frequency = 5)
-df1.ts
+# df1 <- cdata$data[[30]]
+# df1
+# plot_ts(df1)
+
+plot_ts <- function(df){
+    # plot.new()
+    inds <- seq(head(df$devicetimestamp,1),length.out = nrow(df),by = 'day')
+    df.ts <- ts(data = df$avg_imp,start = c(year(inds[1]), as.numeric(format(inds[1], "%j"))),frequency = 365)
+    plot(df.ts)
+}
+
+walk(.x = cdata$data,~plot_ts(.x))
+
 df1.decomposed <- decompose(df1.ts)
 plot(df1.decomposed)
-plot(df1.ts)
 plot(df1.ts-df1.decomposed$seasonal)
-fit <- HoltWinters(df1.ts,beta = F,gamma = F)
+fit <- HoltWinters(df1.ts)
+fit
 plot(fit)
-r <- forecast(fit)
+r <- forecast(fit,h = 20)
 plot(r)
 acf(x = r$residuals[2:288])
