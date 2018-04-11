@@ -3,6 +3,7 @@ library(forecast)
 library(dplyr)
 library(lubridate)
 require(forecast)
+library(ggplot2)
 
 # Data Source: https://datamarket.com/data/set/22t4/monthly-sunspot-number-zurich-1749-1983#!ds=22t4&display=line
 
@@ -42,7 +43,7 @@ df.yearly <- df %>%
 df.yearly
 
 spots.yr <- ts(data = df.yearly$avg_sunspots, frequency = 11)
-spots.yr
+plot(spots.yr)
 forecast::ggtsdisplay(spots.yr, smooth = T, lag.max = 20)
 
 dcomp.yr.a <- decompose(spots.yr, type = 'additive')
@@ -50,3 +51,10 @@ plot(dcomp.yr.a)
 
 dcomp.yr.m <- decompose(spots.yr, type = 'multiplicative')
 plot(dcomp.yr.m)
+
+# Compare the models
+
+resids <- tibble(resid = as.vector(scale(dcomp.yr.a$random,center = T,scale = T)), type = 'additive') %>% bind_rows(tibble(resid = as.vector(scale(dcomp.yr.m$random,center = T,scale = T)), type = 'multiplicative')) %>% na.omit
+
+lattice::densityplot(~resid, groups=type, resids, auto.key=T)
+lattice::qqmath(~resid|type, resids, type=c('p','r'))
