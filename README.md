@@ -19,3 +19,5 @@ Predict-413 - Time Series Analysis &amp; Forecasting Class for MSPA, Spring 2018
 * [Rob Hyndman](https://robjhyndman.com/)
 * [FPP Book](https://www.otexts.org/fpp/)
 * [Hyndman Seminars](https://robjhyndman.com/seminars/eindhoven/)
+* [Ljung Box test](https://robjhyndman.com/hyndsight/ljung-box-test/)
+* [AIC notes](https://robjhyndman.com/hyndsight/aic/)
