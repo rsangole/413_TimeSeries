@@ -5,6 +5,7 @@ library(lubridate)
 library(forecast)
 library(ggplot2)
 library(purrr)
+library(lattice)
 
 # Data Source: https://datamarket.com/data/set/22ty/monthly-traffic-fatalities-in-ontario-1960-1974#!ds=22ty&display=line
 
@@ -31,25 +32,36 @@ ggtsdisplay(ft.ts,
             lag.max = 20,
             main = 'Monthly Traffic Fatalities in Ontario')
 
-fit_ets <- function(ts, model_name, h = 12) {
-    ts %>% ets(model = model_name) %>% forecast(h = h)
+fit_ets <- function(ts, model_name) {
+    ts %>% ets(model = model_name)
 }
 post_process_ets <- function(ets, xlim = c(1970, 1976)) {
-    autoplot(ets, xlim = xlim) %>% print
+    autoplot(ets, xlim = xlim) %>% ggsave(filename = paste0('img/',ets$method,'.png'),device = 'png', width = 8, height = 3)
     checkresiduals(ets)
     summary(ets)
 }
 model_table <- tibble(
-    model_name = c('ZZZ', 'AAA', 'AAN', 'ANN'),
-    model_descrip = c('Auto Select', 'AAA', 'AAN', 'ANN')) %>%
-    mutate(result = map(.x = model_name, ~ fit_ets(ft.ts, model_name = .x)),
-           RMSE = map_dbl(.x = result, ~accuracy(.x)[2]),
-           MAE  = map_dbl(.x = result, ~accuracy(.x)[3]),
-           MPE  = map_dbl(.x = result, ~accuracy(.x)[4]),
-           MAPE = map_dbl(.x = result, ~accuracy(.x)[5]),
-           MASE = map_dbl(.x = result, ~accuracy(.x)[6]))
+    model_name = c('ZZZ', 'AAA', 'ANN'),
+    model_descrip = c('Auto Select', 'Holt-Winters', 'Naive')) %>%
+    mutate(model = map(.x = model_name, ~ fit_ets(ft.ts, model_name = .x))) %>%
+    bind_cols(
+        map_df(.$model, ~sw_glance(.x))
+    ) %>%
+    mutate(forecast = map(.x = model, .f = ~forecast(.x, h=12)))
 
 model_table
 
-walk(model_table$result,
-     ~post_process_ets(.x))
+walk(model_table$forecast, ~post_process_ets(.x))
+
+model_table %>%
+    select(model_descrip, RMSE, MASE, MAPE) %>%
+    reshape2::melt(id.vars = 'model_descrip', variable.name  = 'performance_param') %>%
+    ggplot(aes(x=model_descrip, y= value, fill = model_descrip))+
+    geom_bar(stat='identity',position=position_dodge())+
+    theme_bw()+
+    facet_grid(performance_param~.,scales = 'free_y')
+
+model_table %>%
+    select(model_descrip, RMSE, MASE, MAPE) %>%
+    reshape2::melt(id.vars = 'model_descrip', variable.name  = 'performance_param') %>%
+    xyplot(value~performance_param, groups = model_descrip, auto.key = T, type='b', .)
