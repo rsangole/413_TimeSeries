@@ -47,17 +47,36 @@ arimafit <- fit_autoarima(ft.ts)
 plot(etsfit)
 plot(arimafit)
 
+par(mfrow=c(1,2))
 forecast(etsfit, h = 8) %>% plot
 forecast(arimafit, h = 8) %>% plot
+par(mfrow=c(1,1))
+
+summary(etsfit)
+summary(arimafit)
+
+sw_glance(etsfit) %>% bind_rows(sw_glance(arimafit))
+
+checkresiduals(etsfit)
+checkresiduals(arimafit)
 
 
-post_process_ets <- function(ets, xlim = c(1970, 1976)) {
-    autoplot(ets, xlim = xlim) %>% ggsave(
-        filename = paste0('img/', ets$method, '.png'),
-        device = 'png',
-        width = 8,
-        height = 3
-    )
-    checkresiduals(ets)
-    summary(ets)
-}
+# Test Train Split
+train.ts <- window(ft.ts, end = c(1993,1))
+test.ts <- window(ft.ts, start = c(1993,2))
+
+etsfit_train <- fit_ets(train.ts)
+arimafit_train <- fit_autoarima(train.ts)
+sw_glance(etsfit_train) %>% bind_rows(sw_glance(arimafit_train,test))
+checkresiduals(etsfit_train)
+checkresiduals(arimafit_train)
+
+forecast(etsfit_train, h=6) %>% autoplot() + autolayer(test.ts, series = 'Test data', lwd = 1)
+forecast(arimafit_train, h=6) %>% autoplot() + autolayer(test.ts, series = 'Test data', lwd = 1)
+
+summary(etsfit_train)
+summary(arimafit_train)
+
+results <- accuracy(forecast(etsfit_train, h=6), test.ts) %>% rbind(accuracy(forecast(arimafit_train, h=6), test.ts))
+rownames(results) <- c('ETS Training','ETS Test','ARIMA Training','ARIMA Test')
+results
