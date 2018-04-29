@@ -12,7 +12,8 @@ Predict-413 - Time Series Analysis &amp; Forecasting Class for MSPA, Spring 2018
 * [Stack Overflow 1](https://stackoverflow.com/questions/33128865/starting-a-daily-time-series-in-r)
 * [Stack Overflow 2](https://stackoverflow.com/questions/21949855/read-daily-data-in-r)
 * [Hyndman's page](https://robjhyndman.com/hyndsight/dailydata/)
-
+* [How to handle frequency in ts()](https://robjhyndman.com/hyndsight/seasonal-periods/)
+    
 
 ### References
 
