@@ -1,0 +1,711 @@
+---
+title: "HW 2"
+author: "Rahul Sangole"
+date: April 29, 2018
+fontsize: 11pt
+output:
+  pdf_document: 
+    df_print: kable
+    highlight: tango
+    toc: yes
+    toc_depth: 2
+  html_notebook: default
+---
+```{r include=FALSE}
+library(fpp)
+library(ggplot2)
+library(magrittr)
+library(dplyr)
+library(fma)
+library(magrittr)
+```
+
+# Section 7.8
+##Data set books contains the daily sales of paperback and hardcover books at the same store. The task is to forecast the next four days’ sales for paperback and hardcover books
+###Plot the series and discuss the main features of the data.
+
+Both the time series show a linear upward trend. Visually, the `Paperback` seems to have some regular patters (seasonality) approximately equal to 3 days. 
+
+```{r out.width= '70%', fig.align='center'}
+autoplot(books, facets = T)
+```
+
+There doesn't seem to be any linear correlation between the two series.
+
+```{r out.width= '70%', fig.align='center'}
+lattice::xyplot(Paperback~Hardcover, as.data.frame(books), type=c('p','smooth'))
+```
+
+The PACF plots do show that for `Paperback`, there is a 3-order autocorrelation in the signal which is significant. For `Hardcover`, there is a 1st and 2nd order significance. 
+
+```{r out.width= '70%', fig.align='center'}
+ggPacf(books[,'Paperback'])
+ggPacf(books[,'Hardcover'])
+```
+
+###Use simple exponential smoothing with the ses function (setting initial="simple") and explore different values of alpha for the paperback series. 
+
+Here are three settings - a=0.9, a=0.5, and a=0.01. As `alpha` increases, so does the uncertainty of the prediction since `ses` will look back further in time. Though at alpha = 0.01, the point estimate seems quite low.
+```{r out.width= '70%', fig.align='center'}
+ses(books[,'Paperback'], initial = 'simple', alpha = .9)  %>% forecast() %>% autoplot()
+ses(books[,'Paperback'], initial = 'simple', alpha = .5)  %>% forecast() %>% autoplot()
+ses(books[,'Paperback'], initial = 'simple', alpha = .01) %>% forecast() %>% autoplot()
+```
+
+###Record the within-sample SSE for the one-step forecasts. Plot SSE against alpha and find which value of alpha works best. What is the effect of alpha on the forecasts?
+
+We can see a typical curve as seen during parameter tuning. The SSE is minimum at an alpha value of about 0.2.
+
+```{r out.width= '70%', fig.align='center'}
+sse_list <- c()
+a_list <- seq(0.001, 0.999, length.out = 20)
+for (a_sel in a_list) {
+    ses(books[,'Paperback'], initial = 'simple', alpha = a_sel)$model$SSE -> sse
+    sse_list <- c(sse_list, sse)
+}
+plot(a_list, sse_list, type='b')
+points(a_list[which.min(sse_list)], sse_list[which.min(sse_list)], col='red', pch=20)
+
+```
+
+###Now let ses select the optimal value of alpha. Use this value to generate forecasts for the next four days. Compare your results with 2.
+
+Alpha selected is 0.215.  The point estimate for this forecast seem better than the #2 results. Prediction interval widths are about similar. RMSE is smaller for the auto-alpha selection.
+
+```{r out.width= '70%', fig.align='center'}
+ses(books[,'Paperback'], initial = 'simple', alpha = NULL)$model$par['alpha']
+ses(books[,'Paperback'], initial = 'simple', alpha = NULL)%>% forecast(h=4)%>% autoplot()
+```
+```{r}
+bind_rows(ses(books[,'Paperback'], initial = 'simple', alpha = NULL) %>% 
+              forecast(h=4) %>% accuracy() %>% sweep::sw_tidy(),
+          ses(books[,'Paperback'], initial = 'simple', alpha = 0.01) %>% 
+              forecast(h=4) %>% accuracy() %>% sweep::sw_tidy()) %>% 
+    knitr::kable(format = 'latex',caption = '1st line: Auto-alpha. 2nd line: a=0.01')
+```
+
+###Repeat but with initial="optimal". How much difference does an optimal initial level make?
+
+Setting the initial to optimal reduces RMSE by ~1 unit, and MASE by ~0.02 units.
+
+```{r}
+ses(books[,'Paperback'], initial = 'optimal', alpha = NULL) -> fit_optimal
+ses(books[,'Paperback'], initial = 'simple', alpha = NULL) -> fit_simple
+bind_rows(fit_optimal %>% forecast(h=4) %>% accuracy() %>% sweep::sw_tidy(), 
+          fit_simple %>% forecast(h=4) %>% accuracy() %>% sweep::sw_tidy()) %>% 
+    knitr::kable(format = 'latex',
+                 caption = '1st line: Optimal initial. 2nd line: Simple initial')
+```
+
+###Repeat steps (b)–(d) with the hardcover series.
+
+####Use simple exponential smoothing with the ses function (setting initial="simple") and explore different values of alpha for the paperback series. 
+
+This series does better with a higher value of alpha.
+
+```{r out.width= '70%', fig.align='center'}
+ses(books[,'Hardcover'], initial = 'simple', alpha = .9)  %>% forecast() %>% autoplot()
+ses(books[,'Hardcover'], initial = 'simple', alpha = .5)  %>% forecast() %>% autoplot()
+ses(books[,'Hardcover'], initial = 'simple', alpha = .01) %>% forecast() %>% autoplot()
+``` 
+
+####Record the within-sample SSE for the one-step forecasts. Plot SSE against alpha and find which value of alpha works best. What is the effect of alpha on the forecasts?
+
+We can see a typical curve as seen during parameter tuning. The SSE is minimum at an alpha value of about 0.35.
+
+```{r out.width= '70%', fig.align='center'}
+sse_list <- c()
+a_list <- seq(0.001, 0.999, length.out = 20)
+for (a_sel in a_list) {
+    ses(books[,'Hardcover'], initial = 'simple', alpha = a_sel)$model$SSE -> sse
+    sse_list <- c(sse_list, sse)
+}
+plot(a_list, sse_list, type='b')
+points(a_list[which.min(sse_list)], sse_list[which.min(sse_list)], col='red', pch=20)
+```
+
+####Now let ses select the optimal value of alpha. Use this value to generate forecasts for the next four days. Compare your results with 2.
+
+Alpha selected is 0.347. The point estimate for this forecast seem better than previous results. Prediction interval widths are about similar. RMSE is smaller for the auto-alpha selection.
+
+```{r out.width= '70%', fig.align='center'}
+ses(books[,'Hardcover'], initial = 'simple', alpha = NULL)$model$par['alpha']
+ses(books[,'Hardcover'], initial = 'simple', alpha = NULL)%>% forecast(h=4)%>% autoplot()
+```
+```{r}
+bind_rows(ses(books[,'Hardcover'], initial = 'simple', alpha = NULL) %>% 
+              forecast(h=4) %>% accuracy() %>% sweep::sw_tidy(),
+          ses(books[,'Hardcover'], initial = 'simple', alpha = 0.9) %>% 
+              forecast(h=4) %>% accuracy() %>% sweep::sw_tidy()) %>% 
+    knitr::kable(format = 'latex',caption = '1st line: Auto-alpha. 2nd line: a=0.01')
+```
+
+####Repeat but with initial="optimal". How much difference does an optimal initial level make?
+
+Setting the initial to optimal reduces RMSE by ~2 units, but MASE increased by ~0.01 units.
+
+```{r}
+ses(books[,'Hardcover'], initial = 'optimal', alpha = NULL) -> fit_optimal
+ses(books[,'Hardcover'], initial = 'simple', alpha = NULL) -> fit_simple
+bind_rows(fit_optimal %>% forecast(h=4) %>% accuracy() %>% sweep::sw_tidy(), 
+          fit_simple %>% forecast(h=4) %>% accuracy() %>% sweep::sw_tidy()) %>% 
+    knitr::kable(format = 'latex',
+                 caption = '1st line: Optimal initial. 2nd line: Simple initial')
+```
+
+##Apply Holt’s linear method to the paperback and hardback series and compute four-day forecasts in each case.
+
+```{r out.width= '70%', fig.align='center'}
+holt(books[,'Paperback']) %>% forecast(h=4) %>% autoplot()
+holt(books[,'Hardcover']) %>% forecast(h=4) %>% autoplot()
+```
+
+###Compare the SSE measures of Holt’s method for the two series to those of simple exponential smoothing in the previous question. Discuss the merits of the two forecasting methods for these data sets.
+
+The `holt` method definitely has a lower SSE than the `sse` method since `holt` can account for the upward trend in both the timeseries. `ses` unfortunately, cannot account for this trend.
+
+```{r out.width= '70%', fig.align='center'}
+ses(books[,'Paperback']) %>% residuals() %>% .^2 %>% sum()
+ses(books[,'Hardcover']) %>% residuals() %>% .^2 %>% sum()
+
+holt(books[,'Paperback']) %>% residuals() %>% .^2 %>% sum()
+holt(books[,'Hardcover']) %>% residuals() %>% .^2 %>% sum()
+```
+
+###Compare the forecasts for the two series using both methods. Which do you think is best?
+
+Again, the forecasts created by `holt` have the right upward trend as would be expected from the 
+
+###Calculate a 95% prediction interval for the first forecast for each series using both methods, assuming normal errors. Compare your forecasts with those produced by R.
+
+Using the `forecast` function:
+```{r}
+holt(books[,'Paperback']) %>% forecast(h=1)
+holt(books[,'Hardcover']) %>% forecast(h=1)
+```
+
+##For this exercise, use the quarterly UK passenger vehicle production data from 1977:1--2005:1 (data set ukcars).
+
+###Plot the data and describe the main features of the series.
+
+* Between 1977 and 1980 there is a downward trend
+* From 1980 to 2000, thre is a steady linear increasing trend
+* Something happens in 2000 which causes a sharp decline for a year and picks back up
+* There is a quarterly seasonality we can see
+
+```{r out.width= '70%', fig.align='center'}
+autoplot(ukcars)
+```
+
+###Decompose the series using STL and obtain the seasonally adjusted data.
+```{r out.width= '70%', fig.align='center'}
+stl_fit <- stl(ukcars, s.window = 'periodic')
+autoplot(stl_fit)
+sadjusted <- seasadj(stl_fit)
+```
+
+###Forecast the next two years of the series using an additive damped trend method applied to the seasonally adjusted data. Then reseasonalize the forecasts. Record the parameters of the method and report the RMSE of the one-step forecasts from your method.
+```{r out.width= '70%', fig.align='center'}
+holtfit <- holt(sadjusted, h = 8, damped = T, exponential = F)
+seasonaladjustments <- ukcars-sadjusted
+holtfit_w_seasonal <- holtfit$mean + seasonaladjustments[2:9]
+holtfit_w_seasonal
+```
+Parameters of the fit are here. RMSE is 25.15986.
+```{r}
+summary(holtfit)
+```
+
+###Forecast the next two years of the series using Holt's linear method applied to the seasonally adjusted data. Then reseasonalize the forecasts. Record the parameters of the method and report the RMSE of of the one-step forecasts from your method.
+```{r out.width= '70%', fig.align='center'}
+holtfit_additive <- holt(sadjusted, h = 8, damped = F, exponential = F)
+seasonaladjustments <- ukcars-sadjusted
+holtfit_additive_w_seasonal <- holtfit_additive$mean + seasonaladjustments[2:9]
+holtfit_additive_w_seasonal
+```
+Parameters of the fit are here. RMSE is 25.26.
+```{r}
+summary(holtfit_additive)
+```
+
+###Now use ets() to choose a seasonal model for the data.
+
+ETS selects an A-Ad-A model - Additive error, Additive damped seasonal and Additive trend component.
+
+```{r out.width= '70%', fig.align='center'}
+ets(ukcars, model = 'ZZZ',damped = T) %>% summary()
+```
+
+###Compare the RMSE of the fitted model with the RMSE of the model you obtained using an STL decomposition with Holt's method. Which gives the better in-sample fits?
+
+* RMSE of ETS A-Ad-A model = 25.18409
+* RMSE of Holt Addive Damped modelo on STL decomposed data = 25.15986
+
+The ETS gives *marginally* worse results.
+
+###Compare the forecasts from the two approaches? Which seems most reasonable?
+
+Given how close the RMSE values are we expect very similar forecasts. And we can see this in the plots. They are virtually indistinguishable.
+
+```{r out.width= '70%', fig.align='center'}
+holtfit$mean  <- holtfit$mean + seasonaladjustments[2:9]
+holtfit$upper <- holtfit$upper + seasonaladjustments[2:9]
+holtfit$lower <- holtfit$lower + seasonaladjustments[2:9]
+holtfit$x  <- holtfit$x + seasonaladjustments
+ets(ukcars, model = 'ZZZ',damped = T) %>% forecast() %>% autoplot()
+holtfit %>% autoplot()
+```
+
+## For this exercise, use the monthly Australian short-term overseas visitors data, May 1985--April 2005. (Data set: visitors.)
+
+###Make a time plot of your data and describe the main features of the series.
+
+* Increasing trend, almost linearly increasing
+* Clear seasonality (yearly)
+# Increasing variance of the seasonality over time
+* Sharp drop mid-2004 - something odd happened here
+
+```{r out.width= '70%', fig.align='center'}
+autoplot(visitors)
+```
+
+###Forecast the next two years using Holt-Winters' multiplicative method.
+```{r out.width= '70%', fig.align='center'}
+hw(visitors, seasonal = 'm', damped = F) %>% 
+    forecast(h=12*2) %>% autoplot()
+```
+
+###Why is multiplicative seasonality necessary here?
+
+This is because the seasonality keeps increasing over time. We can visually see this if we keep the seasonality constant (using `decompose`). Look at the residuals - the magnitude keeps increasing over time.
+
+Multiplicative seasonality allows for it to increase over time.
+
+```{r out.width= '70%', fig.align='center'}
+decompose(visitors) %>% plot
+```
+
+###Experiment with making the trend exponential and/or damped.
+
+As expected, the exponential method overpredicts the point estimates than the damped forecast. But, the exponential method seems to have a smaller prediction interval.
+
+```{r out.width= '70%', fig.align='center'}
+hw(visitors, seasonal = 'm', damped = T) %>% 
+    forecast(h=12*2) %>% autoplot()
+hw(visitors, seasonal = 'm', exponential = T) %>% 
+    forecast(h=12*2) %>% autoplot()
+```
+
+###Compare the RMSE of the one-step forecasts from the various methods. Which do you prefer?
+
+The RMSEs are fairly similar for all three models. Based on RMSE I would pick the damped Holt Winters model. MASE for this model is the lowest too.
+
+```{r out.width= '70%', fig.align='center'}
+bind_rows(
+hw(visitors, seasonal = 'm') %>% forecast(h=12*2) %>% 
+    accuracy() %>% sweep::sw_tidy(),
+hw(visitors, seasonal = 'm', damped = T) %>% forecast(h=12*2) %>% 
+    accuracy() %>% sweep::sw_tidy(),
+hw(visitors, seasonal = 'm', exponential = T) %>% forecast(h=12*2) %>% 
+    accuracy() %>% sweep::sw_tidy()
+) %>% mutate(.rownames = c('hw_m','hw_m_d','hw_m_e')) %>% 
+    rename(model = .rownames)
+```
+
+###Now fit each of the following models to the same data:
+
+####a multiplicative Holt-Winters' method;
+```{r out.width= '70%', fig.align='center'}
+hw_m <- hw(visitors, seasonal = 'm') %>% forecast(h=12*2)
+hw_m %>% autoplot()
+```
+
+####an ETS model;
+```{r out.width= '70%', fig.align='center'}
+ets_fit <- ets(visitors) %>% forecast(h=12*2)
+ets_fit %>% autoplot()
+```
+
+####an additive ETS model applied to a Box-Cox transformed series;
+```{r out.width= '70%', fig.align='center'}
+ets_box_fit <- ets(visitors, lambda = 'auto') %>% forecast(h=12*2)
+ets_box_fit %>% autoplot()
+```
+
+####a seasonal naive method applied to the Box-Cox transformed series;
+```{r out.width= '70%', fig.align='center'}
+snaive_box_fit <- snaive(visitors, lambda = 'auto') %>% forecast(h=12*2)
+snaive_box_fit %>% autoplot()
+```
+
+####an STL decomposition applied to the Box-Cox transformed data followed by an ETS model applied to the seasonally adjusted (transformed) data.
+
+This code performs the needed actions. The `stl` function removes the trend from the signal very well. The residuals look fairly random visually.
+
+After adjusting for seasonality, we can see that an ETS model is an A-Ad-N model: no seasonality with a linear damped trend. Now, although we have an additive trend component, the beta coeef is 1e-4, so practically, the forecast is flat as we can see in the plot.
+
+```{r out.width= '70%', fig.align='center'}
+BoxCox.lambda(x = visitors)
+visitors_boxed <- BoxCox(x = visitors, lambda = 0.2775249)
+visitors_stl <- stl(visitors_boxed, s.window = 'periodic')
+plot(visitors_stl)
+visitors_sadj <- seasadj(visitors_stl)
+ets_sadj <- ets(visitors_sadj, model = 'ZZZ', damped = T)
+ets_sadj %>% summary()
+ets_sadj %>% forecast() %>% autoplot()
+```
+
+###For each model, look at the residual diagnostics and compare the forecasts for the next two years. Which do you prefer?
+
+The residuals tell us this:
+
+* HW - There is significant autocorrelation in the model (12,24,36 periods). P-value is low too.
+* ETS - Almost no autocorrelation. Just a bit at 12 periods. P-value is low, but we do have a large sample size, so the test will be sensitive.
+* ETS-BoxCoxed - Almost no autocorrelation.
+* SNaive - LOTS of autocorrelation (as expected).
+* ETS SAdjusted - No autocorrelation.
+
+```{r out.width= '70%', fig.align='center'}
+checkresiduals(hw_m)
+checkresiduals(ets_fit)
+checkresiduals(ets_box_fit)
+checkresiduals(snaive_box_fit)
+checkresiduals(ets_sadj)
+``` 
+
+Putting everything together, we can see that:
+
+* Seasonal naive underpredicts since it can't account for the increasing trend component
+* The BoxCox+STL+ETS method also underpredicts
+* HW seems reasonable
+* ETS seems reasonable as well 
+* ETS-BoxCoxed seems to over predict
+
+Given this information and the residuals, I would probably pick the ETS model. It has almost no autocorrelation and seems to fit the data the best.
+
+```{r message=FALSE, warning=FALSE}
+hw_m = hw_m %>% forecast(h = 12*2) %>% sweep::sw_tidy() %>% 
+    pull('Point Forecast') %>% ts(frequency = 12, start=c(2005,5))
+ets_fit = ets_fit %>% forecast(h = 12*2) %>% sweep::sw_tidy() %>% 
+    pull('Point Forecast') %>% ts(frequency = 12, start=c(2005,5))
+ets_box_fit = ets_box_fit %>% forecast(h = 12*2) %>% sweep::sw_tidy() %>% 
+    pull('Point Forecast') %>% ts(frequency = 12, start=c(2005,5))
+snaive_box_fit = snaive_box_fit %>% forecast(h = 12*2) %>% sweep::sw_tidy() %>% 
+    pull('Point Forecast') %>% ts(frequency = 12, start=c(2005,5))
+ets_reseasoned = ets_sadj %>% forecast(h = 12*2) %>% sweep::sw_tidy() %>% 
+    pull('Point Forecast') %>% ts(frequency = 12, start=c(2005,5))
+ets_reseasoned = (ets_reseasoned + visitors_stl$time.series %>% 
+                      tail(24) %>% .[,'seasonal'] %>% 
+                      as.numeric()) %>% InvBoxCox(lambda = 0.2775249)
+
+ts.union(visitors, hw_m, ets_fit, ets_box_fit, snaive_box_fit, ets_reseasoned) %>% 
+    autoplot(size=2) + xlim(c(2000,2008))
+```
+
+# Section 8.11
+
+##Use R to simulate and plot some data from simple ARIMA models.
+###Use the following R code to generate data from an AR(1) model with phi_1=0.6 and sigma_2=1. The process starts with y0=0.
+```{r}
+y <- ts(data = numeric(100))
+e <- rnorm(n = 100, mean = 0, sd = 1)
+for(i in 2:100)
+  y[i] <- 0.6*y[i-1] + e[i]
+```
+
+###Produce a time plot for the series. How does the plot change as you change phi_1?
+```{r out.width= '70%', fig.align='center'}
+plot(y)
+```
+```{r out.width= '70%', fig.align='center'}
+phi1 <- seq(-1, 1, by = 0.5)
+phi1
+y <- ts(data = numeric(100))
+e <- rnorm(n = 100, mean = 0, sd = 1)
+result <- matrix(nrow = 100,ncol = length(phi1))
+for(p in seq_along(phi1)){
+    for(i in 2:100)
+      y[i] <- phi1[p]*y[i-1] + e[i]
+    result[,p] <- y
+}
+plot (result[,1], type='l', col='gray')
+lines(result[,2], type='l', col='red')
+lines(result[,3], type='l', col='blue')
+lines(result[,4], type='l', col='green')
+lines(result[,5], type='l', col='orange')
+```
+
+Over the range of values of phi_1 from -1 to 1:
+
+* when c = 0, phi < 0 -- we can see that the trend occilates between +ve and -ve. (gray and red lines)
+* when c = 0, phi = 0 -- white noise
+* when c = 0, phi > 0 -- random walk (no drift) (green and orange lines)
+
+###Write your own code to generate data from an MA(1) model with theta_1=0.6 and sigma_2=1.
+```{r}
+y <- ts(data = numeric(100))
+e <- rnorm(n = 100, mean = 0, sd = 1)
+for (i in 2:100){
+    y[i] <- 0.6*e[i-1] + e[i]
+}
+```
+###Produce a time plot for the series. How does the plot change as you change theta_1?
+```{r out.width= '70%', fig.align='center'}
+plot(y)
+```
+```{r out.width= '70%', fig.align='center'}
+theta1 <- seq(-1, 1, by = 0.5)
+theta1
+y <- ts(data = numeric(100))
+e <- rnorm(n = 100, mean = 0, sd = 1)
+result <- matrix(nrow = 100,ncol = length(theta1))
+for(tht in seq_along(theta1)){
+    for(i in 2:100)
+      y[i] <- theta1[tht]*e[i-1] + e[i]
+    result[,tht] <- y
+}
+plot (result[,1], type='l', col='gray')
+lines(result[,2], type='l', col='red')
+lines(result[,3], type='l', col='blue')
+lines(result[,4], type='l', col='green')
+lines(result[,5], type='l', col='orange')
+```
+
+There doesn't seem to any concrete relationship between theta and the result.
+
+###Generate data from an ARMA(1,1) model with phi_1 = 0.6 and theta_1=0.6 and sigma_2=1.
+```{r out.width= '70%', fig.align='center'}
+y <- ts(numeric(100))
+e <- rnorm(100)
+for(i in 2:100)
+    y[i] <- 0.6 * y[i - 1] + 0.6 * e[i - 1] + e[i]
+plot(y)
+```
+
+###Generate data from an AR(2) model with phi_1=-0.8 and phi_2=0.3 and sigma_2=1. (Note that these parameters will give a non-stationary series.)
+```{r out.width= '70%', fig.align='center'}
+y <- ts(numeric(100))
+e <- rnorm(100)
+for(i in 3:100)
+    y[i] <- 0.8 * y[i - 1] + 0.3 * y[i - 2] + e[i]
+plot(y)
+```
+
+###Graph the latter two series and compare them.
+
+Graphed above. While the ARMA(1,1) gives a stationary series, the AR(2) is clearly non-stationary.
+
+##Consider the number of women murdered each year (per 100,000 standard population) in the United States (data set wmurders).
+###By studying appropriate graphs of the series in R, find an appropriate ARIMA(p,d,q) model for these data.
+```{r out.width= '70%', fig.align='center'}
+ggtsdisplay(wmurders)
+```
+* The time series has trending behaviour. It doesn't seem to have any seasonal behavior.
+
+```{r}
+kpss.test(wmurders)
+```
+The KPSS test shows us that we must reject the H0: data are stationary. Differencing the time series by 1:
+```{r out.width= '70%', fig.align='center'}
+ggtsdisplay(diff(wmurders,lag = 1))
+```
+
+* After differencing, the time series seems to be fairly stationary
+* ACF shows us a significant 2nd order component. The PACF also shows a 2nd order significant component.
+
+```{r}
+kpss.test(diff(wmurders,1))
+```
+Trying one more differencing scheme. Double differencing - Differencing the difference by 1:
+```{r out.width= '70%', fig.align='center'}
+ggtsdisplay(diff(diff(wmurders,lag = 1)))
+```
+
+* PACF reduces exponentially.
+* ACF has a significant order 2, and no significant orders after that.
+
+Thus, I can guess that an ARIMA(0, 2, 2) might fit the data well.
+
+###Should you include a constant in the model? Explain.
+Yes, I think we should include a constant. With a constant value included, with a d=1 or d=2, a long term forecast can follow a line or quadratic curve. The time series seems to be downward trending, so a constant will help. If c = 0, with d = 0 or d = 1, we won't get a downward trend. (With c = 0 and d = 2, we can still get a linear trend).
+
+###Write this model in terms of the backshift operator.
+
+    (1 - B)^2 y_t = c + (1 + theta1 x B + theta2 x B^2) x e_t
+
+###Fit the model using R and examine the residuals. Is the model satisfactory?
+```{r out.width= '70%', fig.align='center'}
+fit1 <- Arima(wmurders, order = c(0, 2, 2))
+summary(fit1)
+checkresiduals(fit1)
+```
+The Ljung-Box test shows a p-val > 0.05, so there is little chance of autocorrelation in the residuals. Visually looking at the ACF plot, we can see some there is periodic elements in the residuals. The model seems adequate.
+
+###Forecast three times ahead. Check your forecasts by hand to make sure you know how they have been calculated.
+```{r out.width= '70%', fig.align='center'}
+fit1 %>% forecast(h = 3)
+```
+
+###Create a plot of the series with forecasts and prediction intervals for the next three periods shown.
+```{r out.width= '70%', fig.align='center'}
+fit1 %>% forecast(h = 3) %>% autoplot()
+```
+
+###Does auto.arima give the same model you have chosen? If not, which model do you think is better?
+If we allow `stepwise`:
+```{r out.width= '70%', fig.align='center'}
+auto.arima(wmurders, seasonal = F, allowdrift = T)
+```
+If we force a thorough investigation:
+```{r out.width= '70%', fig.align='center'}
+auto.arima(wmurders, seasonal = T, stepwise = F, allowdrift = T)
+```
+
+The ARIMA(0,2,3) has the lowest AICc value (-6.7) against my selection of ARIMA(0,2,2) with an AICc of -5.7.
+
+##Consider the quarterly number of international tourists to Australia for the period 1999–2010. (Data set austourists.)
+###Describe the time plot.
+```{r out.width= '70%', fig.align='center'}
+autoplot(austourists)
+```
+* Trend component exists
+* Seasonality exists
+* Seasonality increases over time
+
+I'm going to log transform the data
+```{r}
+laustourists <- log(austourists)
+autoplot(laustourists)
+```
+
+###What can you learn from the ACF graph?
+```{r out.width= '70%', fig.align='center'}
+ggAcf(laustourists)
+```
+Very strong seasonality - 4, 8, 12, 16 seen in the components. Reducing strength of the contributions as expected.
+
+###What can you learn from the PACF graph?
+```{r out.width= '70%', fig.align='center'}
+ggPacf(laustourists)
+```
+Strong seasonal components at lag=4. Perhaps a strong non-seasonal component at lag=5.
+
+###Produce plots of the seasonally differenced data (1-B^4)Yt. What model do these graphs suggest?
+
+After adjusting for seasonality, and differencing the data once to make it stationary, the ACF and PACF plots tell me a significant lag of 1 exists. It's hard for me to pick of p=1 or q=1 based on this plot alone.
+
+```{r out.width= '70%', fig.align='center'}
+taustou_adj <- seasadj(stl(laustourists, s.window = 'periodic'))
+autoplot(taustou_adj)
+ggtsdisplay(diff(taustou_adj,1))
+```
+
+Perhaps I might choose a ARIMA(1,0,0)(0,1,1)[4] or a ARIMA(0,0,1)(0,1,1)[4]. But I can't pick without more analysis.
+
+###Does auto.arima give the same model that you chose? If not, which model do you think is better?
+```{r out.width= '70%', fig.align='center'}
+auto.arima(laustourists, stepwise = F)
+```
+It's similar to what I picked, and I tend to agree with it's selection.
+
+###Write the model in terms of the backshift operator, and then without using the backshift operator.
+
+    (1 - phi1 x B)(1 - PHI1 x B^4)(1 - B^4)y_t = (1 + THETA1 x B^4)e_t
+
+##Consider the total net generation of electricity (in billion kilowatt hours) by the U.S. electric industry (monthly for the period 1985–1996). (Data set usmelec.) In general there are two peaks per year: in mid-summer and mid-winter.
+###Examine the 12-month moving average of this series to see what kind of trend is involved.
+```{r out.width= '70%', fig.align='center'}
+autoplot(usmelec)
+ma(usmelec, order = 12) %>% autoplot()
+```
+
+###Do the data need transforming? If so, find a suitable transformation.
+
+Yes, there is an increasing seasonality. Looks like an inverse sqrt will work.
+```{r out.width= '70%', fig.align='center'}
+BoxCox.lambda(usmelec)
+```
+```{r out.width= '70%', fig.align='center'}
+lusmelec <- BoxCox(usmelec, lambda = -0.4772402)
+autoplot(lusmelec)
+```
+
+###Are the data stationary? If not, find an appropriate differencing which yields stationary data.
+
+The data are not stationary. A difference of 1 is needed to make it stationary according to the KPSS test.
+```{r out.width= '70%', fig.align='center'}
+diff(lusmelec,1) %>%  kpss.test()
+```
+Visually, the signal looks stationary.
+```{r out.width= '70%', fig.align='center'}
+lusmelec_diff <- diff(lusmelec)
+lusmelec_diff %>% autoplot()
+```
+Zooming in a bit more, I think I can see seasonality which a diff=1 hasn't got rid of.
+```{r out.width= '70%', fig.align='center'}
+lusmelec_diff %>% window(start=2000) %>% autoplot()
+```
+
+If we look at the ACF, PACF plots, we can see two patterns:
+* a seasonal pattern at 12, 24, 36
+* another seasonal pattern at 3, 6, 9, ...
+
+Looks like we have a complex dual-seasonal pattern even after differencing.
+
+```{r out.width= '70%', fig.align='center'}
+ggtsdisplay(diff(lusmelec,lag = 12))
+```
+
+The PACF plot shows lags at 12, 24, 36 which are seasonal lags. Perhaps an AR(3) term for seasonal is needed. For non-seasonal component, considering the drop in ACF values, the most significant PACF value is for lag = 1. Perhaps an ARIMA(1,0,0)(0,1,3)[12] is a good guess.
+
+###Identify a couple of ARIMA models that might be useful in describing the time series. Which of your models is the best according to their AIC values?
+
+It looks like ARIMA(1,0,1)(1,1,1)[12] has the lowest AIC of -4240.98, after some investigation.
+```{r out.width= '70%', fig.align='center'}
+Arima(lusmelec, order = c(1,0,0), seasonal = list(order=c(0,1,3), period=12))
+Arima(lusmelec, order = c(1,0,0), seasonal = list(order=c(0,1,2), period=12))
+Arima(lusmelec, order = c(1,0,0), seasonal = list(order=c(1,1,2), period=12))
+Arima(lusmelec, order = c(1,0,1), seasonal = list(order=c(0,1,3), period=12))
+Arima(lusmelec, order = c(1,0,1), seasonal = list(order=c(1,1,1), period=12))
+```
+
+###Estimate the parameters of your best model and do diagnostic testing on the residuals. Do the residuals resemble white noise? If not, try to find another ARIMA model which fits better.
+```{r out.width= '70%', fig.align='center'}
+fit_selected <- Arima(lusmelec, order = c(1,0,1), seasonal = list(order=c(1,1,3), period=12))
+fit_selected %>% summary()
+fit_selected %>% checkresiduals()
+```
+
+Residuals show a left skew and the ACF plot shows significant lags at 1,2,14 etc. Trying out another model: an ARIMA(2,0,2)(1,1,3)[12] improved the AIC to -4264.
+
+```{r out.width= '70%', fig.align='center'}
+fit_selected <- Arima(lusmelec, order = c(2,0,2), seasonal = list(order=c(1,1,3), period=12))
+fit_selected %>% summary()
+fit_selected %>% checkresiduals()
+```
+
+What does an auto.arima say? ARIMA(1,1,1)(2,1,1)[12]... but the AICc is worse than the model I chose.
+```{r out.width= '70%', fig.align='center'}
+fit_selected <- auto.arima(lusmelec, stepwise = F)
+fit_selected %>% summary()
+fit_selected %>% checkresiduals()
+```
+
+###Forecast the next 15 years of generation of electricity by the U.S. electric industry. Get the latest figures from http://data.is/zgRWCO to check on the accuracy of your forecasts.
+
+The forecasted model works quite well!! The green line shows the real data for the past few years, while the red line is my forecasts. I am quite pleased.
+
+```{r out.width= '70%', fig.align='center'}
+fit_selected <- Arima(lusmelec, order = c(2,0,2), 
+                      seasonal = list(order=c(1,1,3), period=12))
+forecasted <- fit_selected %>% forecast(h=15*12, lambda = -0.4772402)
+forecasted <- ts.union(usmelec, forecasted$mean)
+load("~/GDrive NU/413 Time Series/413_RProject/newdata.Rdata")
+real_data <- ts(newdata$y, start=c(2011,1), frequency = 12)
+autoplot(forecasted)+autolayer(real_data)
+autoplot(forecasted)+autolayer(real_data)+xlim(c(2009,2015))
+```
+
+###How many years of forecasts do you think are sufficiently accurate to be usable?
+
+Probably a year or two years out. Because forecasting assumes the underlying data generating process remains unchanged. If this changes, then the model is useless.
