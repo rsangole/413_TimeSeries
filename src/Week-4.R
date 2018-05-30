@@ -69,8 +69,8 @@ sw_glance(etsfit_train) %>% bind_rows(sw_glance(arimafit_train,test))
 checkresiduals(etsfit_train)
 checkresiduals(arimafit_train)
 
-forecast(etsfit_train, h=6) %>% autoplot() + autolayer(test.ts, series = 'Test data', lwd = 1) -> p1
-forecast(arimafit_train, h=6) %>% autoplot() + autolayer(test.ts, series = 'Test data', lwd = 1) -> p2
+forecast(etsfit_train, h=6) %>% autoplot() + forecast::autolayer(test.ts, series = 'Test data', lwd = 1) -> p1
+forecast(arimafit_train, h=6) %>% autoplot() + forecast::autolayer(test.ts, series = 'Test data', lwd = 1) -> p2
 gridExtra::grid.arrange(p1,p2)
 
 summary(etsfit_train)

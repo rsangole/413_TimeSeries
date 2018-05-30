@@ -17,7 +17,7 @@ df <- readr::read_csv(
     skip = 1
 )
 df <- df %>%
-    na.omit() %>%
+    stats::na.omit() %>%
     tidyr::separate(mnth, c('year', 'mnth'), convert = T)
 
 df
@@ -28,13 +28,13 @@ ft.ts <- ts(
     frequency = 12
 )
 head(ft.ts, 24)
-ggtsdisplay(ft.ts,
+forecast::ggtsdisplay(ft.ts,
             smooth = T,
             lag.max = 20,
             main = 'Monthly Traffic Fatalities in Ontario')
 
 fit_ets <- function(ts, model_name) {
-    ts %>% ets(model = model_name)
+    ts %>% forecast::ets(model = model_name)
 }
 post_process_ets <- function(ets, xlim = c(1970, 1976)) {
     autoplot(ets, xlim = xlim) %>% ggsave(
