@@ -1,10 +1,9 @@
 library(magrittr)
 library(forecast)
-library(dplyr)
+library(tidyverse)
 library(lubridate)
 require(forecast)
 library(ggplot2)
-
 # Data Source: https://datamarket.com/data/set/22t4/monthly-sunspot-number-zurich-1749-1983#!ds=22t4&display=line
 
 df <- readr::read_csv(
@@ -84,3 +83,28 @@ fit.arima %>%
     exponentiate_forecast_obj %>%
     autoplot(showgap=F) +
     forecast::autolayer(testing, series = 'Test data', lwd = 1)
+
+
+
+# Lauren’s stuff --------------------------------------------------------------------
+
+df <- read_csv('data/quarterly-reports-of-a-french-co.csv')
+df
+
+df_ts <- ts(df$`Quarterly reports of a French company`, frequency = 4)
+df_ts <- head(df_ts, -1)
+df_ts
+
+df_ts_train <- ts(df_ts[1:15],frequency = 4)
+df_ts_test  <- ts(df_ts[16:24],frequency = 4, start = 4.75)
+
+nnet_fit <- forecast::nnetar(window(df_ts, end=4.5), repeats = 10)
+
+nnet_fit %>%
+    forecast::forecast(h=9) %>%
+    ggplot2::autoplot(showgap=T) +
+    forecast::autolayer(window(df_ts, start=4.75), series = 'Test data', lwd = 1)
+
+nnet_fit %>%
+    forecast::forecast(h=9) %>%
+    forecast::accuracy(df_ts[16:24])
